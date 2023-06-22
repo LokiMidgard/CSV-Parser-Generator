@@ -1,6 +1,10 @@
+[![NuGet](https://img.shields.io/nuget/v/CSVParserGenerator.svg?style=flat-square)](https://www.nuget.org/packages/CSVParserGenerator/)
+[![GitHub license](https://img.shields.io/github/license/LokiMidgard/CSV-Parser-Generator.svg?style=flat-squar)](https://tldrlegal.com/license/mit-license#summary)
+
+
 # CSV Parser Generator
 
-A Parser for CSV with support for uncommen line seperators (unicode) and instanciation of readonly objects.
+A Parser for CSV with support for uncommon line separators (e.g. Unicode) and instantiation of read-only objects and working nullable handling.
 
 ## Getting started
 
