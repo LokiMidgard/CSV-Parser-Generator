@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<Version>1.0</Version>
+
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<LangVersion>11.0</LangVersion>
+		<Nullable>enable</Nullable>
+		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+
+		<BuildOutputTargetFolder>analyzers</BuildOutputTargetFolder>
+
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<PackageId>CSVParserGenerator</PackageId>
+		<Authors>Patrick Kranz</Authors>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+
+		<PackageTags>csv;generator;parser</PackageTags>
+		<PackageIcon>icon.png</PackageIcon>
+
+		<PackageReadmeFile>readme.md</PackageReadmeFile>
+		<Description>A Parser for CSV with support for uncommen line seperators (unicode) and instanciation of readonly objects.</Description>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Include="../.editorconfig" Link=".editorconfig" />
+		<None Include="icon.png" Pack="true" PackagePath="\" />
+		<None Include="../readme.md" Pack="true" PackagePath="\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0"
+			PrivateAssets="all" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4"
+			PrivateAssets="all" />
+	</ItemGroup>
+</Project>
