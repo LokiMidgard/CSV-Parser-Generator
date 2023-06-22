@@ -57,7 +57,10 @@ If they are Interfaces, they must be implemented by one of the following classes
 
 For `ImmutableArray`, `ImmutableList` and `ImmutableHashSet` a builder is used to populate the collection
 
-The Properties of the result type must either be string or need to implement `ISpanParsable<T>`.
+The Properties of the result type must either be string or need to implement
+`ISpanParsable<T>`. The Attribute has a list of Property names that will be set.
+Starting with the first column up to the last. If some columns should be
+ignored, use null for that columns property.
 
 ## Configuration
 
@@ -147,10 +150,28 @@ ParseData(data, options);
 ```
 
 
+#### OnError
+
+The parse method should not throw errors. Lines that do not match your
+definition, will be ignored. You can register a Callback with the `OnError`
+Property to be notified every time a row is ignored.
+
+Depending on the Error different classes will be returned. The Type describes
+the kind of error and hold additional information. E.g. `LineErrorParseError`
+has ParsedElement that holds the string that could not be parsed (with the
+limitation that it only works for char data).
+
+```c#
+Parser.Options<char> options = new() { 
+    Culture = System.Globalization.CultureInfo.CurrentCulture
+};
+ParseData(data, options);
+```
+
 #### Culture
 
-When parsing the fields to the configured `CultureInfo` is passed in the parse method of `ISpanParsable`.
-Default is the `InvariantCulture`.
+When parsing the fields to the configured `CultureInfo` is passed in the parse
+method of `ISpanParsable`. Default is the `InvariantCulture`.
 
 ```c#
 Parser.Options<char> options = new() { 

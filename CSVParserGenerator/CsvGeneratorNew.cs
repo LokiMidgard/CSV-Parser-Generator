@@ -17,6 +17,7 @@ public class CsvGeneratord : ISourceGenerator {
     private const string AttributeNamespace = "Parser";
 
     private const string AttributeText = $$"""
+#nullable enable
 using System;
 namespace {{AttributeNamespace}}
 {
@@ -24,7 +25,7 @@ namespace {{AttributeNamespace}}
     [System.Diagnostics.Conditional("AutoNotifyGenerator_DEBUG")]
     sealed class {{AttributeName}}Attribute : Attribute
     {
-        public {{AttributeName}}Attribute(params string[] columns)
+        public {{AttributeName}}Attribute(params string?[] columns)
         {
         }
 
@@ -71,7 +72,22 @@ namespace {{AttributeNamespace}}
         /// </summary>
         public System.Globalization.CultureInfo? Culture { get; init; }
 
+        public Action<LineError>? OnError { get; init; }
     }
+
+
+    internal abstract record LineError(int Line)
+    {
+        public static LineErrorUnexpectedEnd UnexpectedEnd(int line)=> new(line);
+        public static LineErrorParseError ParseError(int lineIndex,int columnIndex,System.Exception e, String? parsedElement) => new(lineIndex, columnIndex + 1, e, parsedElement);
+        public static LineErrorToManyColumns ToManyColumns(int lineIndex,int expectedColumns)=> new(lineIndex, expectedColumns);
+        public static LineErrorNotEnoghColumns NotEnoghColumns(int lineIndex,int columnIndex, int expectedColumns)=> new(lineIndex, columnIndex + 1,expectedColumns);
+    }
+
+    internal record LineErrorUnexpectedEnd(int Line) : LineError(Line);
+    internal record LineErrorParseError(int Line, int Column, System.Exception Exception, String? ParsedElement) : LineError(Line);
+    internal record LineErrorToManyColumns(int Line, int ExpectedColumns) : LineError(Line);
+    internal record LineErrorNotEnoghColumns(int Line, int Column,  int ExpectedColumns) : LineError(Line);
 }
 """;
 
@@ -248,6 +264,8 @@ namespace {{namespaceName}}
         var defaultStringFactory = rawDataType == "System.Byte"
             ? $"new global::{AttributeNamespace}.StringFactory<{rawDataType}>(System.Text.Encoding.UTF8.GetString)"
             : $"new global::{AttributeNamespace}.StringFactory<{rawDataType}>(x=>x.ToString())";
+
+        bool handleError;
         if (methodSymbol.Parameters.Length == 1) {
 
 
@@ -259,6 +277,7 @@ namespace {{namespaceName}}
             var culture = System.Globalization.CultureInfo.InvariantCulture;
         """);
 
+            handleError = false;
 
         } else if (methodSymbol.Parameters.Length == 2) {
             source.AppendLine($$"""
@@ -268,7 +287,9 @@ namespace {{namespaceName}}
             var result = option.NumberOfElements.HasValue ?  {{resultCollectionInstantiation}}(option.NumberOfElements.Value) : {{resultCollectionInstantiation}}();
             var stringFactory = option.StringFactory ?? {{defaultStringFactory}};
             var culture = option.Culture ?? System.Globalization.CultureInfo.InvariantCulture;
+            var onError = option.OnError;
         """);
+            handleError = true;
 
         } else {
             source.AppendLine($"#error \"We need exactly one or two parameters\"");
@@ -377,19 +398,31 @@ namespace {{namespaceName}}
                 restLength = rest.Length;
             """);
 
-            bool ignoreEmpty = propertyType is null || index != properties.Length - 1 || (propertyType.IsValueType && GetFullMetadataName(propertyType) != "System.Nullable");
-            if (ignoreEmpty) {
-                source.AppendLine($$"""
-                if(restLength==0) { 
-                    break;
+            bool errorOnNoMoreData = index != properties.Length - 1 || (propertyType is not null && propertyType.IsValueType && GetFullMetadataName(propertyType) != "System.Nullable");
+            if (errorOnNoMoreData) {
+                if (index > 0) { // for the first column it is not an error
+                    source.AppendLine($$"""
+                        if(restLength==0) { 
+                            {{(handleError ? "onError?.Invoke(Parser.LineError.UnexpectedEnd(lineIndex));" : string.Empty)}}
+                            break;
+                        }
+                        """);
+                } else {
+                    source.AppendLine($$"""
+                        if(restLength==0) { 
+                            break;
+                        }
+                        """);
                 }
-                """);
+
             } else {
+                // This dose not make nothing!
+                // Look closly, it is only the opening part.
                 source.AppendLine($$"""
-                if(restLength!=0) { 
+                 if(restLength!=0) { 
                     
                 
-                """);
+                 """);
 
             }
 
@@ -429,6 +462,17 @@ namespace {{namespaceName}}
                 else
                 {
                     // another column, NOT OK
+                    {{(handleError ? $"onError?.Invoke(Parser.LineError.ToManyColumns(lineIndex, {properties.Length}));" : string.Empty)}}
+                    var next = rest.IndexOfAny(linebreaks);
+                    if(next == -1){
+                        break;
+                    }
+                    rest = rest[next..];
+                    next = rest.IndexOfAnyExcept(linebreaks);
+                    if(next == -1){
+                        break;
+                    }
+                    rest = rest[next..];
                     continue;
                 }
 
@@ -441,6 +485,8 @@ namespace {{namespaceName}}
                 if (end == -1)
                 {
                     // not enogh colums in last line
+                    {{(handleError ? $"onError?.Invoke(Parser.LineError.NotEnoghColumns(lineIndex,{index}, {properties.Length}));" : string.Empty)}}
+
                     break;
                 }
                 else if (rest[end] != seperatorSymbol)
@@ -450,6 +496,7 @@ namespace {{namespaceName}}
                     rest = rest[end..];
                     var next = rest.IndexOfAnyExcept(linebreaks);
                     rest = rest[next..];
+                    {{(handleError ? $"onError?.Invoke(Parser.LineError.NotEnoghColumns(lineIndex,{index}, {properties.Length}));" : string.Empty)}}
                     continue;
                 }
                 else
@@ -504,7 +551,7 @@ namespace {{namespaceName}}
                 """);
             }
 
-            if (!ignoreEmpty) {
+            if (!errorOnNoMoreData) {
                 source.AppendLine($$"""
                 
                     }        
@@ -517,12 +564,46 @@ namespace {{namespaceName}}
 
 
                 source.AppendLine($$"""
-                var {{property}} =  
+                {{propertyType}} {{property}};
+                try {
+                    {{property}} =  
             """);
 
                 HandleProperty(source, property, propertyType, converterMethod, attributeTransformData, context);
 
-                source.Append(";");
+                source.Append($$"""
+                ;
+                    } catch(System.Exception e){
+                        {{(handleError ? $"onError?.Invoke(Parser.LineError.ParseError(lineIndex,{index}, e,{(rawDataType == "System.Char" ? "dataEntry.ToString()" : "null")}));" : string.Empty)}}
+                        
+                
+
+                """);
+                if (index != properties.Length - 1) { // On last column we may not search for linebreaks
+                    source.Append($$"""
+                        {
+                            var next = rest.IndexOfAny(linebreaks);
+                            if(next == -1){
+                                break;
+                            }
+                            rest = rest[next..];
+                        }
+                
+
+                """);
+                }
+                source.Append($$"""
+                        {
+                            var next = rest.IndexOfAnyExcept(linebreaks);
+                            if(next == -1){
+                                break;
+                            }
+                            rest = rest[next..];
+                        }
+                        continue;
+                    }
+
+                """);
             }
 
 
