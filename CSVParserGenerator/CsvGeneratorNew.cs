@@ -10,8 +10,7 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace CsvReader;
 [Generator]
-public class CsvGeneratord : ISourceGenerator
-{
+public class CsvGeneratord : ISourceGenerator {
 
     private const string AttributeName = "CSVParser";
     private const string AttributeTransformerName = "CSVPTransformer";
@@ -77,8 +76,7 @@ namespace {{AttributeNamespace}}
 """;
 
 
-    public void Initialize(GeneratorInitializationContext context)
-    {
+    public void Initialize(GeneratorInitializationContext context) {
         // Register the attribute source
         context.RegisterForPostInitialization((i) => i.AddSource($"{AttributeName}Attribute.g.cs", AttributeText));
 
@@ -86,8 +84,7 @@ namespace {{AttributeNamespace}}
         context.RegisterForSyntaxNotifications(() => new SyntaxReceiver());
     }
 
-    public void Execute(GeneratorExecutionContext context)
-    {
+    public void Execute(GeneratorExecutionContext context) {
         // retrieve the populated receiver 
         if (context.SyntaxContextReceiver is not SyntaxReceiver receiver)
             return;
@@ -98,17 +95,21 @@ namespace {{AttributeNamespace}}
         INamedTypeSymbol notifySymbol = context.Compilation.GetTypeByMetadataName("System.ComponentModel.INotifyPropertyChanged") ?? throw new InvalidOperationException("Cant find expected Type");
 
         // group the fields by class, and generate the source
-        foreach (IGrouping<INamedTypeSymbol, IMethodSymbol> group in receiver.Methods.GroupBy<IMethodSymbol, INamedTypeSymbol>(f => f.ContainingType, SymbolEqualityComparer.Default))
-        {
-            string classSource = ProcessClass(group.Key, group.ToList(), attributeSymbol, attributeTransformerSymbol, notifySymbol, context);
+        foreach (IGrouping<INamedTypeSymbol, IMethodSymbol> group in receiver.Methods.GroupBy<IMethodSymbol, INamedTypeSymbol>(f => f.ContainingType, SymbolEqualityComparer.Default)) {
+            string classSource;
+            try {
+                classSource = ProcessClass(group.Key, group.ToList(), attributeSymbol, attributeTransformerSymbol, notifySymbol, context);
+
+            } catch (System.Exception e) {
+                classSource = "#error\n" + e.ToString();
+
+            }
             context.AddSource($"{group.Key.Name}_csvparse.g.cs", SourceText.From(classSource, System.Text.Encoding.UTF8));
         }
     }
 
-    private string ProcessClass(INamedTypeSymbol classSymbol, List<IMethodSymbol> methods, ISymbol attributeSymbol, ISymbol attributeTransformerSymbol, ISymbol notifySymbol, GeneratorExecutionContext context)
-    {
-        if (!classSymbol.ContainingSymbol.Equals(classSymbol.ContainingNamespace, SymbolEqualityComparer.Default))
-        {
+    private string ProcessClass(INamedTypeSymbol classSymbol, List<IMethodSymbol> methods, ISymbol attributeSymbol, ISymbol attributeTransformerSymbol, ISymbol notifySymbol, GeneratorExecutionContext context) {
+        if (!classSymbol.ContainingSymbol.Equals(classSymbol.ContainingNamespace, SymbolEqualityComparer.Default)) {
             return "FAIL"; //TODO: issue a diagnostic that it must be top level
         }
 
@@ -133,8 +134,7 @@ namespace {{namespaceName}}
         // }
 
         // create properties for each field 
-        foreach (var methodSymbol in methods)
-        {
+        foreach (var methodSymbol in methods) {
             ProcessMethod(source, methodSymbol, attributeSymbol, attributeTransformerSymbol, context);
         }
 
@@ -145,8 +145,7 @@ namespace {{namespaceName}}
 
 
 
-    private void ProcessMethod(StringBuilder source, IMethodSymbol methodSymbol, ISymbol attributeSymbol, ISymbol attributeTransformerSymbol, GeneratorExecutionContext context)
-    {
+    private void ProcessMethod(StringBuilder source, IMethodSymbol methodSymbol, ISymbol attributeSymbol, ISymbol attributeTransformerSymbol, GeneratorExecutionContext context) {
         // get the name and type of the field
         // string fieldName = methodSymbol.Name;
         // ITypeSymbol fieldType = methodSymbol.Type;
@@ -178,13 +177,10 @@ namespace {{namespaceName}}
 
         ITypeSymbol targetType;
         ITypeSymbol resultCollection = methodSymbol.ReturnType;
-        if (resultCollection is INamedTypeSymbol returnTypeSymbol && returnTypeSymbol.IsGenericType && returnTypeSymbol.TypeArguments.Length > 0)
-        {
+        if (resultCollection is INamedTypeSymbol returnTypeSymbol && returnTypeSymbol.IsGenericType && returnTypeSymbol.TypeArguments.Length > 0) {
             targetType = returnTypeSymbol.TypeArguments[0];
-        }
-        else
-        {
-            source.AppendLine($"#ERROR \"It is assumed that the instances are the first generic Argument of the return type {resultCollection}\"");
+        } else {
+            source.AppendLine($"#error \"It is assumed that the instances are the first generic Argument of the return type {resultCollection}\"");
             return;
         }
 
@@ -205,41 +201,29 @@ namespace {{namespaceName}}
             context.Compilation.GetTypeByMetadataName($"System.Collections.Generic.HashSet`1") ?? throw new InvalidOperationException("Expected type dose not exist System.Collections.Generic.HashSet<{resultType}>"),
         };
 
-        if (resultCollection.TypeKind == TypeKind.Interface && (supportedCollections.FirstOrDefault(x => x.Interfaces.Any(y => GetFullMetadataName(y) == GetFullMetadataName(resultCollection))) is INamedTypeSymbol implementingType))
-        {
+        if (resultCollection.TypeKind == TypeKind.Interface && (supportedCollections.FirstOrDefault(x => x.Interfaces.Any(y => GetFullMetadataName(y) == GetFullMetadataName(resultCollection))) is INamedTypeSymbol implementingType)) {
             resultCollection = implementingType;
-        }
-        else if (resultCollection.TypeKind == TypeKind.Interface)
-        {
-            source.AppendLine($"#ERROR \"Unsupported Interface type {resultCollection}\"");
+        } else if (resultCollection.TypeKind == TypeKind.Interface) {
+            source.AppendLine($"#error \"Unsupported Interface type {resultCollection}\"");
             return;
         }
 
-        if (GetFullMetadataName(resultCollection) == "System.Collections.Immutable.ImmutableArray")
-        {
+        if (GetFullMetadataName(resultCollection) == "System.Collections.Immutable.ImmutableArray") {
             resultCollectionInstantiation = $$"""System.Collections.Immutable.ImmutableArray.CreateBuilder<{{resultType}}>""";
             resultCollectionFinish = ".ToImmutable()";
-        }
-        else if (GetFullMetadataName(resultCollection) == "System.Collections.Immutable.ImmutableHashSet")
-        {
+        } else if (GetFullMetadataName(resultCollection) == "System.Collections.Immutable.ImmutableHashSet") {
             resultCollectionInstantiation = $$"""System.Collections.Immutable.ImmutableHashSet.CreateBuilder<{{resultType}}>""";
             resultCollectionFinish = ".ToImmutable()";
-        }
-        else if (GetFullMetadataName(resultCollection) == "System.Collections.Immutable.ImmutableList")
-        {
+        } else if (GetFullMetadataName(resultCollection) == "System.Collections.Immutable.ImmutableList") {
             resultCollectionInstantiation = $$"""System.Collections.Immutable.ImmutableList.CreateBuilder<{{resultType}}>""";
             resultCollectionFinish = ".ToImmutable()";
-        }
-        else if (resultCollection.GetMembers("Add").FirstOrDefault() is IMethodSymbol addMethod
-            && addMethod.Parameters.Length == 1
-            && GetFullMetadataName(addMethod.Parameters[0].Type) == resultType)
-        {
+        } else if (resultCollection.GetMembers("Add").FirstOrDefault() is IMethodSymbol addMethod
+              && addMethod.Parameters.Length == 1
+              && GetFullMetadataName(addMethod.Parameters[0].Type) == resultType) {
             resultCollectionInstantiation = $"new {resultCollection}";
             resultCollectionFinish = "";
-        }
-        else
-        {
-            source.AppendLine($"#ERROR \"Cant handle return type {resultCollection}\"");
+        } else {
+            source.AppendLine($"#error \"Cant handle return type {resultCollection}\"");
             return;
         }
 
@@ -247,20 +231,16 @@ namespace {{namespaceName}}
         string rawDataType;
 
 
-        if (methodSymbol.Parameters.Length > 0)
-        {
+        if (methodSymbol.Parameters.Length > 0) {
 
-            if (methodSymbol.Parameters[0].Type is not INamedTypeSymbol namedParameter || GetFullMetadataName(namedParameter) != "System.ReadOnlySpan" || (GetFullMetadataName(namedParameter.TypeArguments[0]) != "System.Byte" && GetFullMetadataName(namedParameter.TypeArguments[0]) != "System.Char"))
-            {
-                source.AppendLine($"#ERROR \"Frist Parameter must be ReadOnlySpan<char> or ReadOnlySpan<byte>\"");
+            if (methodSymbol.Parameters[0].Type is not INamedTypeSymbol namedParameter || GetFullMetadataName(namedParameter) != "System.ReadOnlySpan" || (GetFullMetadataName(namedParameter.TypeArguments[0]) != "System.Byte" && GetFullMetadataName(namedParameter.TypeArguments[0]) != "System.Char")) {
+                source.AppendLine($"#error \"Frist Parameter must be ReadOnlySpan<char> or ReadOnlySpan<byte>\"");
                 return;
             }
 
             rawDataType = GetFullMetadataName(namedParameter.TypeArguments[0]);
-        }
-        else
-        {
-            source.AppendLine($"#ERROR \"Frist Parameter must be ReadOnlySpan<char> or ReadOnlySpan<byte>\"");
+        } else {
+            source.AppendLine($"#error \"Frist Parameter must be ReadOnlySpan<char> or ReadOnlySpan<byte>\"");
             return;
         }
 
@@ -268,8 +248,7 @@ namespace {{namespaceName}}
         var defaultStringFactory = rawDataType == "System.Byte"
             ? $"new global::{AttributeNamespace}.StringFactory<{rawDataType}>(System.Text.Encoding.UTF8.GetString)"
             : $"new global::{AttributeNamespace}.StringFactory<{rawDataType}>(x=>x.ToString())";
-        if (methodSymbol.Parameters.Length == 1)
-        {
+        if (methodSymbol.Parameters.Length == 1) {
 
 
             source.AppendLine($$"""
@@ -281,9 +260,7 @@ namespace {{namespaceName}}
         """);
 
 
-        }
-        else if (methodSymbol.Parameters.Length == 2)
-        {
+        } else if (methodSymbol.Parameters.Length == 2) {
             source.AppendLine($$"""
         {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}(global::System.ReadOnlySpan<{{rawDataType}}> raw, global::{{AttributeNamespace}}.Options<{{rawDataType}}> option)
         {
@@ -293,10 +270,8 @@ namespace {{namespaceName}}
             var culture = option.Culture ?? System.Globalization.CultureInfo.InvariantCulture;
         """);
 
-        }
-        else
-        {
-            source.AppendLine($"#ERROR \"We need exactly one or two parameters\"");
+        } else {
+            source.AppendLine($"#error \"We need exactly one or two parameters\"");
             return;
 
         }
@@ -308,8 +283,7 @@ namespace {{namespaceName}}
             var seperatorSymbol = ({{rawDataType}})'{{seperatorSymbol}}';
         """);
 
-        if (!extendedLineFeed)
-        {
+        if (!extendedLineFeed) {
             source.AppendLine($$"""
             {{rawDataType}} lineBreak = ({{rawDataType}})'\n', lineFeed = ({{rawDataType}})'\r';
             ReadOnlySpan<{{rawDataType}}> linebreaks = stackalloc {{rawDataType}}[] { lineBreak, lineFeed};
@@ -317,10 +291,8 @@ namespace {{namespaceName}}
                 
         """);
 
-        }
-        else
-        if (rawDataType == "System.Byte")
-        {
+        } else
+        if (rawDataType == "System.Byte") {
             source.AppendLine($$"""
             byte lineBreak = (byte)'\n', lineFeed = (byte)'\r', /*paragraphSeperator = (byte)'\u2029', lineSeperator = (byte)'\u2028',*/ nextLine = (byte)'\u0085', formFeed = (byte)'\f';
             ReadOnlySpan<{{rawDataType}}> linebreaks = stackalloc {{rawDataType}}[] { lineBreak, lineFeed, nextLine, formFeed};
@@ -328,9 +300,7 @@ namespace {{namespaceName}}
                 
         """);
 
-        }
-        else
-        {
+        } else {
             source.AppendLine($$"""
             char lineBreak = '\n', lineFeed = '\r', paragraphSeperator = '\u2029', lineSeperator = '\u2028', nextLine = '\u0085', formFeed = '\f';
             ReadOnlySpan<{{rawDataType}}> linebreaks = stackalloc {{rawDataType}}[] { lineBreak, lineFeed, paragraphSeperator, lineSeperator, nextLine, formFeed};
@@ -374,12 +344,26 @@ namespace {{namespaceName}}
             rest = rest[next..];
         """);
 
-        string[] properties = argument.Values.Select(x => x.Value).OfType<string>().ToArray();
-        foreach (var (property, index) in properties.Select((x, i) => (x, i)))
-        {
+        string?[] properties = argument.Values.Select(x => x.Value).OfType<string?>().ToArray();
+        foreach (var (property, index) in properties.Select((x, i) => (x, i))) {
 
-            var propertyType = targetType.GetMembers(property).OfType<IPropertySymbol>().SingleOrDefault()?.Type
-            ?? targetType.GetMembers(property).OfType<IFieldSymbol>().SingleOrDefault().Type;
+            ITypeSymbol? propertyType;
+
+            if (property is null) {
+                propertyType = null;
+            } else {
+
+                propertyType = targetType.GetMembers(property).OfType<IPropertySymbol>().SingleOrDefault()?.Type;
+                propertyType ??= targetType.GetMembers(property).OfType<IFieldSymbol>().SingleOrDefault()?.Type;
+
+                if (propertyType is null) {
+                    source.AppendLine($"""
+                        #error "Property {property}" not found
+                    """);
+                }
+
+            }
+
 
 
 
@@ -389,21 +373,18 @@ namespace {{namespaceName}}
             var converterMethod = converter?.ConstructorArguments[1].Value as string;
 
             source.AppendLine($$"""
-                // BEGIN {{property}}
+                // BEGIN {{property ?? "IGNORED"}}
                 restLength = rest.Length;
             """);
 
-            bool ignoreEmpty = index != properties.Length - 1 || (propertyType.IsValueType && GetFullMetadataName(propertyType) != "System.Nullable");
-            if (ignoreEmpty)
-            {
+            bool ignoreEmpty = propertyType is null || index != properties.Length - 1 || (propertyType.IsValueType && GetFullMetadataName(propertyType) != "System.Nullable");
+            if (ignoreEmpty) {
                 source.AppendLine($$"""
                 if(restLength==0) { 
                     break;
                 }
                 """);
-            }
-            else
-            {
+            } else {
                 source.AppendLine($$"""
                 if(restLength!=0) { 
                     
@@ -435,8 +416,7 @@ namespace {{namespaceName}}
 
                 end = rest.IndexOfAny(seperators);
         """);
-            if (index == properties.Length - 1)
-            {
+            if (index == properties.Length - 1) {
 
                 source.AppendLine($$"""
                 // ON LASt Column
@@ -453,9 +433,7 @@ namespace {{namespaceName}}
                 }
 
                 """);
-            }
-            else
-            {
+            } else {
 
                 source.AppendLine($$"""
 
@@ -507,8 +485,7 @@ namespace {{namespaceName}}
             
             """);
 
-            if (index == properties.Length - 1)
-            {
+            if (index == properties.Length - 1) {
 
                 source.AppendLine($$"""
                 // ON LASt Column
@@ -527,9 +504,7 @@ namespace {{namespaceName}}
                 """);
             }
 
-            if (!ignoreEmpty)
-
-            {
+            if (!ignoreEmpty) {
                 source.AppendLine($$"""
                 
                     }        
@@ -538,19 +513,23 @@ namespace {{namespaceName}}
 
             }
 
-            source.AppendLine($$"""
+            if (property is not null && propertyType is not null) {
+
+
+                source.AppendLine($$"""
                 var {{property}} =  
             """);
 
-            HandleProperty(source, property, propertyType, converterMethod, attributeTransformData, context);
+                HandleProperty(source, property, propertyType, converterMethod, attributeTransformData, context);
 
-            source.Append(";");
+                source.Append(";");
+            }
 
 
             source.AppendLine($$"""
                 
                 propertyIndex++;
-                // END {{property}}
+                // END {{property ?? "IGNORED"}}
             """);
 
 
@@ -564,7 +543,7 @@ namespace {{namespaceName}}
             
 
         var instance = new {{resultType}}(){
-            {{string.Join(",\n            ", argument.Values.Select((v, i) => $"{v.Value} = {v.Value}"))}}
+            {{string.Join(",\n            ", argument.Values.Where(x => !x.IsNull).Select((v, i) => $"{v.Value} = {v.Value}"))}}
         };
         result.Add(instance);
     }
@@ -573,18 +552,12 @@ namespace {{namespaceName}}
 }
 """);
 
-        static void HandleProperty(StringBuilder source, string property, ITypeSymbol propertyType, string? converterMethod, List<AttributeData> attributeTransformData, GeneratorExecutionContext context)
-        {
-            if (converterMethod is not null)
-            {
+        static void HandleProperty(StringBuilder source, string property, ITypeSymbol propertyType, string? converterMethod, List<AttributeData> attributeTransformData, GeneratorExecutionContext context) {
+            if (converterMethod is not null) {
                 source.AppendLine($$"""  {{converterMethod}}(dataEntry)""");
-            }
-            else if (GetFullMetadataName(propertyType) == "System.String")
-            {
+            } else if (GetFullMetadataName(propertyType) == "System.String") {
                 source.AppendLine($$""" stringFactory(dataEntry)""");
-            }
-            else if (GetFullMetadataName(propertyType) == "System.Nullable" && propertyType is INamedTypeSymbol namedPropertyType)
-            {
+            } else if (GetFullMetadataName(propertyType) == "System.Nullable" && propertyType is INamedTypeSymbol namedPropertyType) {
                 var actualType = namedPropertyType.TypeArguments[0];
 
                 var converter = attributeTransformData.SingleOrDefault(x => x.ConstructorArguments[0].Value is Type type && (context.Compilation.GetTypeByMetadataName(type.FullName)?.Equals(propertyType, SymbolEqualityComparer.Default) ?? false));
@@ -598,22 +571,17 @@ namespace {{namespaceName}}
 
 
 
-            }
-            else if (propertyType.Interfaces.Any(x => GetFullMetadataName(x) == "System.ISpanParsable"))
-            {
+            } else if (propertyType.Interfaces.Any(x => GetFullMetadataName(x) == "System.ISpanParsable")) {
                 source.AppendLine($$""" {{GetFullMetadataName(propertyType)}}.Parse(stringFactory(dataEntry), culture)""");
-            }
-            else
-            {
+            } else {
                 source.AppendLine($$"""
-            #Error "{{property}} can't be parsed unsupported property Type {{GetFullMetadataName(propertyType)}}"
+            #error "{{property}} can't be parsed unsupported property Type {{GetFullMetadataName(propertyType)}}"
             """);
 
-                foreach (var x in propertyType.Interfaces)
-                {
+                foreach (var x in propertyType.Interfaces) {
 
                     source.AppendLine($$"""
-                        #Error "Interface {{GetFullMetadataName(x)}} "
+                        #error "Interface {{GetFullMetadataName(x)}} "
                         """);
                 }
             }
@@ -623,22 +591,18 @@ namespace {{namespaceName}}
     /// <summary>
     /// Created on demand before each generation pass
     /// </summary>
-    class SyntaxReceiver : ISyntaxContextReceiver
-    {
+    class SyntaxReceiver : ISyntaxContextReceiver {
         public List<IMethodSymbol> Methods { get; } = new();
 
         /// <summary>
         /// Called for every syntax node in the compilation, we can inspect the nodes and save any information useful for generation
         /// </summary>
-        public void OnVisitSyntaxNode(GeneratorSyntaxContext context)
-        {
+        public void OnVisitSyntaxNode(GeneratorSyntaxContext context) {
             // any field with at least one attribute is a candidate for property generation
             if (context.Node is MethodDeclarationSyntax methondDeclarationSyntax
-                && methondDeclarationSyntax.AttributeLists.Count > 0)
-            {
+                && methondDeclarationSyntax.AttributeLists.Count > 0) {
                 var symbol = context.SemanticModel.GetDeclaredSymbol(methondDeclarationSyntax);
-                if (symbol is IMethodSymbol methodSymbol && methodSymbol.GetAttributes().Any(ad => ad.AttributeClass?.ToDisplayString() == $"{AttributeNamespace}.{AttributeName}Attribute"))
-                {
+                if (symbol is IMethodSymbol methodSymbol && methodSymbol.GetAttributes().Any(ad => ad.AttributeClass?.ToDisplayString() == $"{AttributeNamespace}.{AttributeName}Attribute")) {
                     Methods.Add(methodSymbol);
                 }
             }
@@ -646,10 +610,8 @@ namespace {{namespaceName}}
     }
 
 
-    public static string GetFullMetadataName(ISymbol s)
-    {
-        if (s == null || IsRootNamespace(s))
-        {
+    public static string GetFullMetadataName(ISymbol s) {
+        if (s == null || IsRootNamespace(s)) {
             return string.Empty;
         }
 
@@ -658,14 +620,10 @@ namespace {{namespaceName}}
 
         s = s.ContainingSymbol;
 
-        while (!IsRootNamespace(s))
-        {
-            if (s is ITypeSymbol && last is ITypeSymbol)
-            {
+        while (!IsRootNamespace(s)) {
+            if (s is ITypeSymbol && last is ITypeSymbol) {
                 sb.Insert(0, '+');
-            }
-            else
-            {
+            } else {
                 sb.Insert(0, '.');
             }
 
@@ -677,10 +635,8 @@ namespace {{namespaceName}}
         return sb.ToString();
     }
 
-    private static string GetVisibility(Accessibility accessibility)
-    {
-        return accessibility switch
-        {
+    private static string GetVisibility(Accessibility accessibility) {
+        return accessibility switch {
             Accessibility.Private => "private",
             Accessibility.Public => "public",
             Accessibility.Internal => "internal",
@@ -691,8 +647,7 @@ namespace {{namespaceName}}
 
 
 
-    private static bool IsRootNamespace(ISymbol symbol)
-    {
+    private static bool IsRootNamespace(ISymbol symbol) {
         return symbol is INamespaceSymbol s && s.IsGlobalNamespace;
     }
 }

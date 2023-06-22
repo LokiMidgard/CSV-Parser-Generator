@@ -1,15 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<Version>1.0</Version>
+		<Version>1.1</Version>
 
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<LangVersion>11.0</LangVersion>
 		<Nullable>enable</Nullable>
+
 		<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-
 		<BuildOutputTargetFolder>analyzers</BuildOutputTargetFolder>
-
-		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -20,10 +18,12 @@
 
 		<PackageTags>csv;generator;parser</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
-		<PackageIconUrl>https://raw.githubusercontent.com/LokiMidgard/CSV-Parser-Generator/master/CSVParserGenerator/icon.png</PackageIconUrl>
+		<PackageIconUrl>
+			https://raw.githubusercontent.com/LokiMidgard/CSV-Parser-Generator/master/CSVParserGenerator/icon.png</PackageIconUrl>
 
 		<PackageReadmeFile>readme.md</PackageReadmeFile>
-		<Description>A Parser for CSV with support for uncommon line separators (e.g. Unicode) and instantiation of read-only objects and working nullable handling.</Description>
+		<Description>A Parser for CSV with support for uncommon line separators (e.g. Unicode) and
+			instantiation of read-only objects and working nullable handling.</Description>
 
 		<RepositoryType>git</RepositoryType>
 		<RepositoryUrl>https://github.com/LokiMidgard/CSV-Parser-Generator.git</RepositoryUrl>
