@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<Version>1.2</Version>
+		<Version>1.3</Version>
 
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<LangVersion>11.0</LangVersion>
@@ -13,7 +13,7 @@
 	<PropertyGroup>
 		<PackageId>CSVParserGenerator</PackageId>
 		<Authors>Patrick Kranz</Authors>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageLicenseExpression>Unlicense</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 
 		<PackageTags>csv;generator;parser</PackageTags>
