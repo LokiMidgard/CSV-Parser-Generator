@@ -365,7 +365,7 @@ namespace {{namespaceName}}
             rest = rest[next..];
         """);
 
-        string?[] properties = argument.Values.Select(x => x.Value).OfType<string?>().ToArray();
+        string?[] properties = argument.Values.Select(x => x.Value).Where(x=>x is null || x is string).Cast<string?>().ToArray();
         foreach (var (property, index) in properties.Select((x, i) => (x, i))) {
 
             ITypeSymbol? propertyType;
