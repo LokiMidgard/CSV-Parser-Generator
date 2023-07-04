@@ -133,6 +133,7 @@ namespace {{AttributeNamespace}}
 
         // begin building the generated source
         StringBuilder source = new StringBuilder($$"""
+#nullable restore
 using System;
 
 namespace {{namespaceName}}
@@ -338,7 +339,6 @@ namespace {{namespaceName}}
     var rest = raw;
 
     var lineIndex = 0;
-    var fileHasHader = {{hasHeader.ToString().ToLower()}};
     while (true){
 
             lineIndex++;
@@ -617,11 +617,6 @@ namespace {{namespaceName}}
         }
 
         source.AppendLine($$"""
-            
-            var lineHasError = false;
-
-
-            
 
         var instance = new {{resultType}}(){
             {{string.Join(",\n            ", argument.Values.Where(x => !x.IsNull).Select((v, i) => $"{v.Value} = {v.Value}"))}}
