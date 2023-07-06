@@ -362,6 +362,10 @@ namespace {{namespaceName}}
 
             rest = rest[next..];
             next = rest.IndexOfAnyExcept(linebreaks);
+            if (next == -1)
+            {
+                break;
+            }
             rest = rest[next..];
         """);
 
@@ -493,10 +497,14 @@ namespace {{namespaceName}}
                 {
                     // not enogh colums in last line
                     // find start of next line
+                    {{(handleError ? $"onError?.Invoke(Parser.LineError.NotEnoghColumns(lineIndex,{index}, {properties.Length}));" : string.Empty)}}
                     rest = rest[end..];
                     var next = rest.IndexOfAnyExcept(linebreaks);
+                    if (next == -1)
+                    {
+                        break;
+                    }
                     rest = rest[next..];
-                    {{(handleError ? $"onError?.Invoke(Parser.LineError.NotEnoghColumns(lineIndex,{index}, {properties.Length}));" : string.Empty)}}
                     continue;
                 }
                 else
