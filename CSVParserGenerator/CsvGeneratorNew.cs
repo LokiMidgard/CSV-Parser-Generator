@@ -360,10 +360,38 @@ namespace {{namespaceName}}
         }
 
         source.AppendLine($$"""
+            Span<{{rawDataType}}> linebreaksAndQuote = stackalloc {{rawDataType}}[linebreaks.Length + 1];
+            linebreaks.CopyTo(linebreaksAndQuote);
+            linebreaksAndQuote[^1] = quoteSymbol;
+            """);
+
+        source.AppendLine($$"""
+            var rest = raw;
+        """);
+
+        if (hasHeader)
+            source.AppendLine($$"""
+            {
+                // Skip first line
+                var next = rest.IndexOfAny(linebreaks);
+                if (next == -1)
+                {
+                     return result{{resultCollectionFinish}};
+                }
+
+                rest = rest[next..];
+                next = rest.IndexOfAnyExcept(linebreaks);
+                if (next == -1)
+                {
+                     return result{{resultCollectionFinish}};
+                }
+                rest = rest[next..];
+            }
+        """);
+
+        source.AppendLine($$"""
 
 
-
-    var rest = raw;
 
     var lineIndex = 0;
     while (true){
@@ -379,25 +407,6 @@ namespace {{namespaceName}}
             
             int restLength;
 """);
-        if (hasHeader)
-            source.AppendLine($$"""
-            {
-                // Skip first line
-                var next = rest.IndexOfAny(linebreaks);
-                if (next == -1)
-                {
-                    break;
-                }
-
-                rest = rest[next..];
-                next = rest.IndexOfAnyExcept(linebreaks);
-                if (next == -1)
-                {
-                    break;
-                }
-                rest = rest[next..];
-            }
-        """);
 
         string?[] properties = argument.Values.Select(x => x.Value).Where(x => x is null || x is string).Cast<string?>().ToArray();
         foreach (var (property, index) in properties.Select((x, i) => (x, i))) {
@@ -506,13 +515,41 @@ namespace {{namespaceName}}
                 {
                     // another column, NOT OK
                     {{(handleError ? $"onError?.Invoke(Parser.LineError.ToManyColumns(lineIndex, {properties.Length}));" : string.Empty)}}
-                    var next = rest.IndexOfAny(linebreaks);
-                    if(next == -1){
+                    searchNextLineBreak:
+                    var next = rest.IndexOfAny(linebreaksAndQuote);
+                    if (next == -1)
+                    {
                         break;
+                    }
+                    else if (rest[next] == quoteSymbol)
+                    {
+                        findNextNonescapedQuote:
+                        rest = rest[(next + 1)..];
+                        if (rest.Length == 0)
+                        {
+                            break;
+                        }
+                        next = rest.IndexOf(quoteSymbol);
+                        if(next== -1)
+                        {
+                            break;
+                        }
+                        rest = rest[(next+1)..];
+                        if (rest.Length == 0)
+                        {
+                            break;
+                        }else if (rest[0] == quoteSymbol)
+                        {
+                            // this was a double quote that must be ignored
+                            // search the next quote
+                            goto findNextNonescapedQuote;
+                        }
+                        goto searchNextLineBreak;
                     }
                     rest = rest[next..];
                     next = rest.IndexOfAnyExcept(linebreaks);
-                    if(next == -1){
+                    if (next == -1)
+                    {
                         break;
                     }
                     rest = rest[next..];
@@ -632,11 +669,38 @@ namespace {{namespaceName}}
                 if (index != properties.Length - 1) { // On last column we may not search for linebreaks
                     source.Append($$"""
                         {
-                            var next = rest.IndexOfAny(linebreaks);
-                            if(next == -1){
-                                break;
-                            }
-                            rest = rest[next..];
+                            searchNextLineBreak:
+                                var next = rest.IndexOfAny(linebreaksAndQuote);
+                                if (next == -1)
+                                {
+                                    break;
+                                }
+                                else if (rest[next] == quoteSymbol)
+                                {
+                                    findNextNonescapedQuote:
+                                    rest = rest[(next + 1)..];
+                                    if (rest.Length == 0)
+                                    {
+                                        break;
+                                    }
+                                    next = rest.IndexOf(quoteSymbol);
+                                    if(next== -1)
+                                    {
+                                        break;
+                                    }
+                                    rest = rest[(next+1)..];
+                                    if (rest.Length == 0)
+                                    {
+                                        break;
+                                    }else if (rest[0] == quoteSymbol)
+                                    {
+                                        // this was a double quote that must be ignored
+                                        // search the next quote
+                                        goto findNextNonescapedQuote;
+                                    }
+                                    goto searchNextLineBreak;
+                                }
+                                rest = rest[next..];
                         }
                 
 
