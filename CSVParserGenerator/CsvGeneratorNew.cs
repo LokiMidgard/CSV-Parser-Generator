@@ -381,20 +381,22 @@ namespace {{namespaceName}}
 """);
         if (hasHeader)
             source.AppendLine($$"""
-            // Skip first line
-            var next = rest.IndexOfAny(linebreaks);
-            if (next == -1)
             {
-                break;
-            }
+                // Skip first line
+                var next = rest.IndexOfAny(linebreaks);
+                if (next == -1)
+                {
+                    break;
+                }
 
-            rest = rest[next..];
-            next = rest.IndexOfAnyExcept(linebreaks);
-            if (next == -1)
-            {
-                break;
+                rest = rest[next..];
+                next = rest.IndexOfAnyExcept(linebreaks);
+                if (next == -1)
+                {
+                    break;
+                }
+                rest = rest[next..];
             }
-            rest = rest[next..];
         """);
 
         string?[] properties = argument.Values.Select(x => x.Value).Where(x => x is null || x is string).Cast<string?>().ToArray();
