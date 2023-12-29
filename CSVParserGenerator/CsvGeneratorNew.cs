@@ -8,9 +8,11 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
+
 namespace CsvReader;
 [Generator]
 public class CsvGeneratord : ISourceGenerator {
+
 
     private const string AttributeName = "CSVParser";
     private const string AttributeTransformerName = "CSVPTransformer";
@@ -144,6 +146,31 @@ namespace {{namespaceName}}
     {
 
 """);
+
+        foreach (string rawdataType in new[] { "byte", "char" }) {
+            source.AppendLine($$"""
+                private static void ReplaceDouble(ref ReadOnlySpan<{{rawdataType}}> from, {{rawdataType}} toQote) {
+                    var to = new {{rawdataType}}[from.Length];
+                    int j = 0;
+                    bool lastWasQuoted = false;
+                    for (var i = 0; i < from.Length; i++) {
+                        if (from[i] == toQote) {
+                            if (lastWasQuoted) {
+                                to[j++] = toQote;
+                                lastWasQuoted = false;
+                            } else {
+                                lastWasQuoted = true;
+                            }
+                        } else {
+                            to[j++] = from[i];
+                            lastWasQuoted = false;
+                        }
+                    }
+                    from = to.AsSpan()[..j];
+                }
+
+            """);
+        }
 
         // // if the class doesn't implement INotifyPropertyChanged already, add it
         // if (!classSymbol.Interfaces.Contains(notifySymbol, SymbolEqualityComparer.Default)) {
@@ -343,6 +370,7 @@ namespace {{namespaceName}}
 
             lineIndex++;
 
+            bool replaceDoubleQuotes;
             bool isQuoted;
             int isQuotedInt;
             int start, end;
@@ -369,7 +397,7 @@ namespace {{namespaceName}}
             rest = rest[next..];
         """);
 
-        string?[] properties = argument.Values.Select(x => x.Value).Where(x=>x is null || x is string).Cast<string?>().ToArray();
+        string?[] properties = argument.Values.Select(x => x.Value).Where(x => x is null || x is string).Cast<string?>().ToArray();
         foreach (var (property, index) in properties.Select((x, i) => (x, i))) {
 
             ITypeSymbol? propertyType;
@@ -443,10 +471,19 @@ namespace {{namespaceName}}
                 start = isQuotedInt;
                 //? 1
                 //: 0;
-
+                replaceDoubleQuotes = false;
+                
                 if (isQuoted)
-            {
-                end = rest[1..].IndexOf(quoteSymbol) + 2;
+            {  
+                end = 0;
+                var oldEnd = end;
+                do{
+                    if(end>0) {
+                        replaceDoubleQuotes = true;
+                    }
+                    oldEnd = end;
+                    end = rest[(oldEnd + 1)..].IndexOf(quoteSymbol) + 2 + oldEnd;
+                } while(rest[end] == '"');
             }
             else
             {
@@ -526,6 +563,9 @@ namespace {{namespaceName}}
                 }
 
                 dataEntry = rest[start..(end - isQuotedInt)];
+                if(replaceDoubleQuotes){
+                  ReplaceDouble(ref  dataEntry, ({{rawDataType}})'{{(quoteSymbol == '\'' ? $"\\'" : quoteSymbol)}}');
+                }
                 if (end + 1 < restLength)
                 {
                     rest = rest[(end + 1)..];
