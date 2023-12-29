@@ -1,5 +1,5 @@
 [![NuGet](https://img.shields.io/nuget/v/CSVParserGenerator.svg?style=flat-square)](https://www.nuget.org/packages/CSVParserGenerator/)
-[![GitHub license](https://img.shields.io/github/license/LokiMidgard/CSV-Parser-Generator.svg?style=flat-squar)](https://tldrlegal.com/license/mit-license#summary)
+[![GitHub license](https://img.shields.io/github/license/LokiMidgard/CSV-Parser-Generator.svg?style=flat-square)](https://tldrlegal.com/license/mit-license#summary)
 
 
 # CSV Parser Generator
