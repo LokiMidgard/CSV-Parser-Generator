@@ -13,7 +13,7 @@ internal partial class TestParsers {
         nameof(TestItem.Timestamp),
         nameof(TestItem.TimeSpan))]
     public static partial List<TestItem> ParseTestItemNoHeader(
-        ReadOnlySpan<char> raw,
+        ReadOnlySpan<char> raw1,
         Options<char> option);
 
     [CSVParser(

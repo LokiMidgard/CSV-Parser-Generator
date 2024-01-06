@@ -305,8 +305,9 @@ namespace {{namespaceName}}
 
             
             source.AppendLine($$"""
-        {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}{{typeParameter}}(global::System.ReadOnlySpan<{{rawDataType}}> raw)
+        {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}{{typeParameter}}(global::System.ReadOnlySpan<{{rawDataType}}> {{methodSymbol.Parameters[0].Name}})
         {
+            {{(methodSymbol.Parameters[0].Name != "raw" ? $"var raw = {methodSymbol.Parameters[0].Name};" : "")}}
             var result = {{resultCollectionInstantiation}}(); ;
             var stringFactory = {{defaultStringFactory}};
             var culture = System.Globalization.CultureInfo.InvariantCulture;
@@ -316,9 +317,11 @@ namespace {{namespaceName}}
 
         } else if (methodSymbol.Parameters.Length == 2) {
             source.AppendLine($$"""
-        {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}{{typeParameter}}(global::System.ReadOnlySpan<{{rawDataType}}> raw, global::{{AttributeNamespace}}.Options<{{rawDataType}}> option)
+        {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}{{typeParameter}}(global::System.ReadOnlySpan<{{rawDataType}}> {{methodSymbol.Parameters[0].Name}}, global::{{AttributeNamespace}}.Options<{{rawDataType}}> {{methodSymbol.Parameters[1].Name}})
         {
             
+            {{(methodSymbol.Parameters[0].Name != "raw" ? $"var raw = {methodSymbol.Parameters[0].Name};" : "")}}
+            {{(methodSymbol.Parameters[1].Name != "option" ? $"var option = {methodSymbol.Parameters[1].Name};" : "")}}
             var result = option.NumberOfElements.HasValue ?  {{resultCollectionInstantiation}}(option.NumberOfElements.Value) : {{resultCollectionInstantiation}}();
             var stringFactory = option.StringFactory ?? {{defaultStringFactory}};
             var culture = option.Culture ?? System.Globalization.CultureInfo.InvariantCulture;
