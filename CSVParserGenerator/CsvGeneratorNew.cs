@@ -172,6 +172,10 @@ namespace {{namespaceName}}
             """);
         }
 
+        source.AppendLine("""
+            private static T ParseSpan<T>(ReadOnlySpan<char> s, IFormatProvider? provider) where T : global::System.ISpanParsable<T> => T.Parse(s,provider);
+            """);
+
         // // if the class doesn't implement INotifyPropertyChanged already, add it
         // if (!classSymbol.Interfaces.Contains(notifySymbol, SymbolEqualityComparer.Default)) {
         //     source.AppendLine("public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;");
@@ -219,10 +223,10 @@ namespace {{namespaceName}}
 
 
 
-        ITypeSymbol targetType;
+        INamedTypeSymbol targetType;
         ITypeSymbol resultCollection = methodSymbol.ReturnType;
         if (resultCollection is INamedTypeSymbol returnTypeSymbol && returnTypeSymbol.IsGenericType && returnTypeSymbol.TypeArguments.Length > 0) {
-            targetType = returnTypeSymbol.TypeArguments[0];
+            targetType = (INamedTypeSymbol)returnTypeSymbol.TypeArguments[0];
         } else {
             source.AppendLine($"#error \"It is assumed that the instances are the first generic Argument of the return type {resultCollection}\"");
             return;
@@ -245,20 +249,20 @@ namespace {{namespaceName}}
             context.Compilation.GetTypeByMetadataName($"System.Collections.Generic.HashSet`1") ?? throw new InvalidOperationException("Expected type dose not exist System.Collections.Generic.HashSet<{resultType}>"),
         };
 
-        if (resultCollection.TypeKind == TypeKind.Interface && (supportedCollections.FirstOrDefault(x => x.Interfaces.Any(y => GetFullMetadataName(y) == GetFullMetadataName(resultCollection))) is INamedTypeSymbol implementingType)) {
-            resultCollection = implementingType;
+        if (resultCollection.TypeKind == TypeKind.Interface && (supportedCollections.FirstOrDefault(x => x.Interfaces.Any(y => GetFullMetadataNameWithoutGeneric(y) == GetFullMetadataNameWithoutGeneric(resultCollection))) is INamedTypeSymbol implementingType)) {
+            resultCollection = implementingType.Construct(targetType);
         } else if (resultCollection.TypeKind == TypeKind.Interface) {
             source.AppendLine($"#error \"Unsupported Interface type {resultCollection}\"");
             return;
         }
 
-        if (GetFullMetadataName(resultCollection) == "System.Collections.Immutable.ImmutableArray") {
+        if (GetFullMetadataNameWithoutGeneric(resultCollection) == "System.Collections.Immutable.ImmutableArray") {
             resultCollectionInstantiation = $$"""System.Collections.Immutable.ImmutableArray.CreateBuilder<{{resultType}}>""";
             resultCollectionFinish = ".ToImmutable()";
-        } else if (GetFullMetadataName(resultCollection) == "System.Collections.Immutable.ImmutableHashSet") {
+        } else if (GetFullMetadataNameWithoutGeneric(resultCollection) == "System.Collections.Immutable.ImmutableHashSet") {
             resultCollectionInstantiation = $$"""System.Collections.Immutable.ImmutableHashSet.CreateBuilder<{{resultType}}>""";
             resultCollectionFinish = ".ToImmutable()";
-        } else if (GetFullMetadataName(resultCollection) == "System.Collections.Immutable.ImmutableList") {
+        } else if (GetFullMetadataNameWithoutGeneric(resultCollection) == "System.Collections.Immutable.ImmutableList") {
             resultCollectionInstantiation = $$"""System.Collections.Immutable.ImmutableList.CreateBuilder<{{resultType}}>""";
             resultCollectionFinish = ".ToImmutable()";
         } else if (resultCollection.GetMembers("Add").FirstOrDefault() is IMethodSymbol addMethod
@@ -277,7 +281,7 @@ namespace {{namespaceName}}
 
         if (methodSymbol.Parameters.Length > 0) {
 
-            if (methodSymbol.Parameters[0].Type is not INamedTypeSymbol namedParameter || GetFullMetadataName(namedParameter) != "System.ReadOnlySpan" || (GetFullMetadataName(namedParameter.TypeArguments[0]) != "System.Byte" && GetFullMetadataName(namedParameter.TypeArguments[0]) != "System.Char")) {
+            if (methodSymbol.Parameters[0].Type is not INamedTypeSymbol namedParameter || GetFullMetadataNameWithoutGeneric(namedParameter) != "System.ReadOnlySpan" || (GetFullMetadataNameWithoutGeneric(namedParameter.TypeArguments[0]) != "System.Byte" && GetFullMetadataNameWithoutGeneric(namedParameter.TypeArguments[0]) != "System.Char")) {
                 source.AppendLine($"#error \"Frist Parameter must be ReadOnlySpan<char> or ReadOnlySpan<byte>\"");
                 return;
             }
@@ -288,17 +292,20 @@ namespace {{namespaceName}}
             return;
         }
 
-
-        var defaultStringFactory = rawDataType == "System.Byte"
+        var defaultStringFactory = rawDataType == "byte"
             ? $"new global::{AttributeNamespace}.StringFactory<{rawDataType}>(System.Text.Encoding.UTF8.GetString)"
             : $"new global::{AttributeNamespace}.StringFactory<{rawDataType}>(x=>x.ToString())";
 
         bool handleError;
+        var typeParameter = methodSymbol.TypeArguments.Length > 0
+            ? $"<{string.Join(", ", methodSymbol.TypeArguments.Select(x => x.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)))}>"
+            : "";
         if (methodSymbol.Parameters.Length == 1) {
 
 
+            
             source.AppendLine($$"""
-        {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}(global::System.ReadOnlySpan<{{rawDataType}}> raw)
+        {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}{{typeParameter}}(global::System.ReadOnlySpan<{{rawDataType}}> raw)
         {
             var result = {{resultCollectionInstantiation}}(); ;
             var stringFactory = {{defaultStringFactory}};
@@ -309,7 +316,7 @@ namespace {{namespaceName}}
 
         } else if (methodSymbol.Parameters.Length == 2) {
             source.AppendLine($$"""
-        {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}(global::System.ReadOnlySpan<{{rawDataType}}> raw, global::{{AttributeNamespace}}.Options<{{rawDataType}}> option)
+        {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}{{typeParameter}}(global::System.ReadOnlySpan<{{rawDataType}}> raw, global::{{AttributeNamespace}}.Options<{{rawDataType}}> option)
         {
             
             var result = option.NumberOfElements.HasValue ?  {{resultCollectionInstantiation}}(option.NumberOfElements.Value) : {{resultCollectionInstantiation}}();
@@ -745,9 +752,9 @@ namespace {{namespaceName}}
         static void HandleProperty(StringBuilder source, string property, ITypeSymbol propertyType, string? converterMethod, List<AttributeData> attributeTransformData, GeneratorExecutionContext context) {
             if (converterMethod is not null) {
                 source.AppendLine($$"""  {{converterMethod}}(dataEntry)""");
-            } else if (GetFullMetadataName(propertyType) == "System.String") {
+            } else if (GetFullMetadataNameWithoutGeneric(propertyType) == "System.String") {
                 source.AppendLine($$""" stringFactory(dataEntry)""");
-            } else if (GetFullMetadataName(propertyType) == "System.Nullable" && propertyType is INamedTypeSymbol namedPropertyType) {
+            } else if (GetFullMetadataNameWithoutGeneric(propertyType) == "System.Nullable" && propertyType is INamedTypeSymbol namedPropertyType) {
                 var actualType = namedPropertyType.TypeArguments[0];
 
                 var converter = attributeTransformData.SingleOrDefault(x => x.ConstructorArguments[0].Value is Type type && (context.Compilation.GetTypeByMetadataName(type.FullName)?.Equals(propertyType, SymbolEqualityComparer.Default) ?? false));
@@ -761,8 +768,9 @@ namespace {{namespaceName}}
 
 
 
-            } else if (propertyType.Interfaces.Any(x => GetFullMetadataName(x) == "System.ISpanParsable")) {
-                source.AppendLine($$""" {{GetFullMetadataName(propertyType)}}.Parse(stringFactory(dataEntry), culture)""");
+            } else if (propertyType.Interfaces.Any(x => GetFullMetadataNameWithoutGeneric(x) == "System.ISpanParsable")) {
+                
+                source.AppendLine($$""" ParseSpan<{{propertyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}>(stringFactory(dataEntry), culture)""");
             } else {
                 source.AppendLine($$"""
             #error "{{property}} can't be parsed unsupported property Type {{GetFullMetadataName(propertyType)}}"
@@ -804,7 +812,13 @@ namespace {{namespaceName}}
         if (s == null || IsRootNamespace(s)) {
             return string.Empty;
         }
+        return s.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+    }
 
+    public static string GetFullMetadataNameWithoutGeneric(ISymbol s) {
+        if (s == null || IsRootNamespace(s)) {
+            return string.Empty;
+        }
         var sb = new StringBuilder(s.Name);
         var last = s;
 
