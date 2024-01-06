@@ -58,4 +58,18 @@ public class IntegrationTests {
             items,
             item => Assert.True(item.Value));
     }
+
+    [Fact]
+    public void TestNoLineEnd() {
+        var data = "1,\"name\",\"2023-12-31 09:00:00\",\"00:00:01.25\"";
+        var items = TestParsers.ParseTestItemNoHeader(data, _defaultOptions);
+        Assert.Collection(
+             items,
+             item => {
+                 Assert.Equal(1, item.Id);
+                 Assert.Equal("name", item.Name);
+                 Assert.Equal(new DateTime(2023, 12, 31, 9, 0, 0), item.Timestamp);
+                 Assert.Equal(new TimeSpan(0, 0, 0, 1, 250), item.TimeSpan);
+             });
+    }
 }

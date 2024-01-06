@@ -504,7 +504,10 @@ namespace {{namespaceName}}
                     }
                     oldEnd = end;
                     end = rest[(oldEnd + 1)..].IndexOf(quoteSymbol) + 2 + oldEnd;
-                } while(rest[end] == '"');
+                } while(end != -1 && end < rest.Length && rest[end] == '"');
+                if(end >= rest.Length){
+                    end = -1;
+                }
             }
             else
             {
