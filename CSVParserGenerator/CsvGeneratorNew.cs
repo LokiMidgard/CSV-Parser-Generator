@@ -303,7 +303,7 @@ namespace {{namespaceName}}
         if (methodSymbol.Parameters.Length == 1) {
 
 
-            
+
             source.AppendLine($$"""
         {{GetVisibility(methodSymbol.DeclaredAccessibility)}} {{(methodSymbol.IsStatic ? " static " : "")}} partial {{methodSymbol.ReturnType}} {{methodSymbol.Name}}{{typeParameter}}(global::System.ReadOnlySpan<{{rawDataType}}> {{methodSymbol.Parameters[0].Name}})
         {
@@ -418,7 +418,9 @@ namespace {{namespaceName}}
             int restLength;
 """);
 
-        string?[] properties = argument.Values.Select(x => x.Value).Where(x => x is null || x is string).Cast<string?>().ToArray();
+        string?[] properties = argument.Values.Length > 0
+            ? argument.Values.Select(x => x.Value).Where(x => x is null || x is string).Cast<string?>().ToArray()
+            : targetType.GetMembers().Where(x => x.Kind == SymbolKind.Property).OrderBy(x => x.Locations.First().SourceSpan).Select(x => x.Name).ToArray();
         foreach (var (property, index) in properties.Select((x, i) => (x, i))) {
 
             ITypeSymbol? propertyType;
@@ -746,7 +748,7 @@ namespace {{namespaceName}}
         source.AppendLine($$"""
 
         var instance = new {{resultType}}(){
-            {{string.Join(",\n            ", argument.Values.Where(x => !x.IsNull).Select((v, i) => $"{v.Value} = {v.Value}"))}}
+            {{string.Join(",\n            ", properties.Select((v, i) => $"{v} = {v}"))}}
         };
         result.Add(instance);
     }
@@ -775,7 +777,7 @@ namespace {{namespaceName}}
 
 
             } else if (propertyType.Interfaces.Any(x => GetFullMetadataNameWithoutGeneric(x) == "System.ISpanParsable")) {
-                
+
                 source.AppendLine($$""" ParseSpan<{{propertyType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}}>(stringFactory(dataEntry), culture)""");
             } else {
                 source.AppendLine($$"""

@@ -33,6 +33,9 @@ BE4015A0-9B37-4A1E-A92A-405496A1FF96,"Max Mustermann",2001-04-01,64
     [Parser.CSVParser(nameof(Person.Id), nameof(Person.Name), nameof(Person.Birthdate), nameof(Person.Score))]
     internal partial IEnumerable<Person> ParseData(ReadOnlySpan<byte> data);
     ```
+    1. You can add an list of propertynames, this will be the colums.
+    1. You can use null to ignore some columns in the csv
+    1. You can omit the list then the colums will be assigned in order of the properties in the type. This dose not work ~~well~~ at all if the properties are defined in multiple files.
 1. Call your `ParseData` and run your program, that's it.
 
 

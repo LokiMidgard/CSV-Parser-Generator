@@ -37,4 +37,9 @@ internal partial class TestParsers {
     public static partial List<TestBoolItem> ParseTestBoolItem(
         ReadOnlySpan<char> raw,
         Options<char> option);
+
+    [CSVParser]
+    public static partial List<TestItem> ParseTestNoColomnsSpecified(
+    ReadOnlySpan<char> raw1,
+    Options<char> option);
 }

@@ -26,6 +26,19 @@ public class IntegrationTests {
                 Assert.Equal(new TimeSpan(0, 0, 0, 1, 250), item.TimeSpan);
             });
     }
+    [Fact]
+    public void TestNoColomnsSpecified() {
+        var data = TestDataSource.LoadCsv("data-without-header.csv");
+        var items = TestParsers.ParseTestItemNoHeader(data, _defaultOptions);
+        Assert.Collection(
+            items,
+            item => {
+                Assert.Equal(1, item.Id);
+                Assert.Equal("name", item.Name);
+                Assert.Equal(new DateTime(2023, 12, 31), item.Timestamp);
+                Assert.Equal(new TimeSpan(0, 0, 0, 1, 250), item.TimeSpan);
+            });
+    }
 
     [Fact]
     public void TestWithHeader() {
