@@ -40,6 +40,7 @@ namespace {{AttributeNamespace}}
 
         public char SeperatorSymbol {get; set;}
         public char QuoteSymbol {get; set;}
+        public char EscapeSymbol {get; set;}
     }
 
     [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
@@ -211,6 +212,7 @@ namespace {{namespaceName}}
         var extendedLineFeed = (attributeData.NamedArguments.FirstOrDefault(x => x.Key == "ExtendedLineFeed ").Value.Value as bool?) ?? false;
         var seperatorSymbol = (attributeData.NamedArguments.FirstOrDefault(x => x.Key == "SeperatorSymbol").Value.Value as char?) ?? ',';
         var quoteSymbol = (attributeData.NamedArguments.FirstOrDefault(x => x.Key == "QuoteSymbol").Value.Value as char?) ?? '"';
+        var escapeSymbol = (attributeData.NamedArguments.FirstOrDefault(x => x.Key == "QuoteSymbol").Value.Value as char?);
 
 
         // string propertyName = chooseName(fieldName, overridenNameOpt);
@@ -341,6 +343,12 @@ namespace {{namespaceName}}
             var quoteSymbol = ({{rawDataType}})'{{quoteSymbol}}';
             var seperatorSymbol = ({{rawDataType}})'{{seperatorSymbol}}';
         """);
+
+        if (escapeSymbol.HasValue) {
+            source.AppendLine($$"""
+            var escapeSymbol = ({{rawDataType}})'{{escapeSymbol.Value}}';
+        """);
+        }
 
         if (!extendedLineFeed) {
             source.AppendLine($$"""
@@ -748,7 +756,7 @@ namespace {{namespaceName}}
         source.AppendLine($$"""
 
         var instance = new {{resultType}}(){
-            {{string.Join(",\n            ", properties.Select((v, i) => $"{v} = {v}"))}}
+            {{string.Join(",\n            ", properties.Where(x=>!string.IsNullOrWhiteSpace(x)).Select((v, i) => $"{v} = {v}"))}}
         };
         result.Add(instance);
     }

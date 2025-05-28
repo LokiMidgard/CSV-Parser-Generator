@@ -39,6 +39,19 @@ public class IntegrationTests {
                 Assert.Equal(new TimeSpan(0, 0, 0, 1, 250), item.TimeSpan);
             });
     }
+    [Fact]
+    public void TestNullColumn() {
+        var data = TestDataSource.LoadCsv("data-without-header.csv");
+        var items = TestParsers.ParseTestItemWithNullColumn(data, _defaultOptions);
+        Assert.Collection(
+            items,
+            item => {
+                Assert.Equal(1, item.Id);
+                Assert.Equal("name", item.Name);
+                Assert.Equal(null, item.Timestamp);
+                Assert.Equal(new TimeSpan(0, 0, 0, 1, 250), item.TimeSpan);
+            });
+    }
 
     [Fact]
     public void TestWithHeader() {
@@ -75,6 +88,21 @@ public class IntegrationTests {
     [Fact]
     public void TestNoLineEnd() {
         var data = "1,\"name\",\"2023-12-31 09:00:00\",\"00:00:01.25\"";
+        var items = TestParsers.ParseTestItemNoHeader(data, _defaultOptions);
+        Assert.Collection(
+             items,
+             item => {
+                 Assert.Equal(1, item.Id);
+                 Assert.Equal("name", item.Name);
+                 Assert.Equal(new DateTime(2023, 12, 31, 9, 0, 0), item.Timestamp);
+                 Assert.Equal(new TimeSpan(0, 0, 0, 1, 250), item.TimeSpan);
+             });
+    }
+
+    [Fact]
+    public void TestEscape() {
+        // this dose ont work \ escape for seperator not supported.
+        var data = "1,name\\,Foo,\"2023-12-31 09:00:00\",\"00:00:01.25\"";
         var items = TestParsers.ParseTestItemNoHeader(data, _defaultOptions);
         Assert.Collection(
              items,

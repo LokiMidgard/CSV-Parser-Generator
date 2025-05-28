@@ -15,6 +15,25 @@ internal partial class TestParsers {
     public static partial List<TestItem> ParseTestItemNoHeader(
         ReadOnlySpan<char> raw1,
         Options<char> option);
+    [CSVParser(
+        nameof(TestItem.Id),
+        nameof(TestItem.Name),
+        null,
+        nameof(TestItem.TimeSpan))]
+    public static partial List<TestItem> ParseTestItemWithNullColumn(
+        ReadOnlySpan<char> raw1,
+        Options<char> option);
+
+    [CSVParser(
+    nameof(TestItem.Id),
+    nameof(TestItem.Name),
+    nameof(TestItem.Timestamp),
+    nameof(TestItem.TimeSpan),
+        EscapeSymbol ='\\')]
+    public static partial List<TestItem> ParseTestItemWithEscape(
+    ReadOnlySpan<char> raw1,
+    Options<char> option);
+
 
     [CSVParser(
         nameof(TestItem.Id),
